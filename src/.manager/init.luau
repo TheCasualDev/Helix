@@ -57,7 +57,7 @@ local LOADED_IDENTIFIER = if IsClient then "Client" else "Server"
 
 -- Private Functions
 
--- Recursive Search is exactly what it says on the box.
+-- RecursiveSearch is exactly what it says on the box.
 -- A simple loop checks what type of instance it is, and the current search depth.
 -- If it is a File, it checks the current depth and will determine
 -- If it is a ModuleScript, it runs the function defined by callback (loadModule function)
