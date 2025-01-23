@@ -1,0 +1,32 @@
+{
+  "name": "Helix",
+  "tree": {
+    
+    "$className": "DataModel",
+
+    "ReplicatedFirst": {
+      "$ignoreUnknownInstances": true,
+      "$path": "src/.start"
+    },
+    "ReplicatedStorage": {
+      "$ignoreUnknownInstances": true,
+      "$path": "src/shared",
+      "ModuleManager": {
+        "$path": "src/.manager"
+      }
+    },
+
+    "ServerScriptService": {
+      "$ignoreUnknownInstances": true,
+        "$path": "src/server"
+    },
+
+    "StarterPlayer": {
+      "StarterPlayerScripts": {
+        "$ignoreUnknownInstances": true,
+        "$path": "src/client"
+      }
+    }
+
+  }
+}
