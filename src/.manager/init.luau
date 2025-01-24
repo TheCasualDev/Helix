@@ -55,12 +55,56 @@ local ACTOR_PARENT = if IsClient then Players.LocalPlayer.PlayerScripts else Ser
 local PRINT_IDENTIFIER = if IsClient then "[C]" else "[S]"
 local LOADED_IDENTIFIER = if IsClient then "Client" else "Server"
 
+-- Main Function
+
+function Shared.Start(container: Instance)
+	-- PLACEHOLDER
+end
+
 -- Private Functions
+
+function Local.LoadModule(module: ModuleScript)
+	local start_time = tick()
+
+	if module:GetAttribute("Parallel") then
+		-- TODO: Setup parallel loading (and make it work this time)
+		Local.Warn("Parallel is not setup yet.")
+	end
+
+	if SETTINGS.VERBOSE_LOADING then
+		Local.Print(("Loading module %q"):format(module.Name))
+	end
+
+	local success, response = pcall(function()
+		local LoadedModule = require(module)
+
+		Shared.Tracker.LOAD[module] = LoadedModule
+
+		if LoadedModule.Init then
+			Shared.Tracker.INIT[module] = false
+		end
+		if LoadedModule.Start then
+			Shared.Tracker.STRT[module] = false
+		end
+	end)
+
+	local end_time = tick()
+
+	if not SETTINGS.VERBOSE_LOADING then
+		return
+	end
+
+	if success then
+		Local.Print(`>> Loaded module {module.Name}`, Local.Time(start_time, end_time))
+	else
+		Local.Warn(`>> Failed to load module {module.Name} got response: {response}`, Local.Time(start_time, end_time))
+	end
+end
 
 -- RecursiveSearch is exactly what it says on the box.
 -- A simple loop checks what type of instance it is, and the current search depth.
 -- If it is a File, it checks the current depth and will determine
--- If it is a ModuleScript, it runs the function defined by callback (loadModule function)
+-- If it is a ModuleScript, it runs the function defined by callback (LoadModule function)
 function Local.RecursiveSearch(
 	container: Instance,
 	current_depth: number,
@@ -80,11 +124,16 @@ function Local.RecursiveSearch(
 end
 
 -- Custom print functions to make the console organised
+
 function Local.Print(...)
 	print(PRINT_IDENTIFIER, ...)
 end
 function Local.Warn(...)
 	warn(PRINT_IDENTIFIER, ...)
+end
+
+function Local.Time(start_time: number, end_time: number)
+	("took %.3f"):format(end_time - start_time)
 end
 
 return Shared
