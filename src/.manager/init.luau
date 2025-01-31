@@ -21,7 +21,7 @@
 
 local SETTINGS = {
 	FOLDER_SEARCH_DEPTH = 1,
-	VERBOSE_LOADING = true,
+	VERBOSE_LOADING = false,
 	WAIT_FOR_SERVER = true,
 }
 
@@ -58,6 +58,8 @@ local LOADED_IDENTIFIER = if IsClient then "Client" else "Server"
 -- Main Function
 
 function Shared.Start(container: Instance)
+	local start_time = tick()
+
 	if IsClient and SETTINGS.WAIT_FOR_SERVER and not workspace:GetAttribute("ServerLoaded") then
 		workspace:GetAttributeChangedSignal("ServerLoaded"):Wait()
 	end
@@ -67,12 +69,38 @@ function Shared.Start(container: Instance)
 	end
 
 	if SETTINGS.VERBOSE_LOADING then
-		Local.Warn("=== LOADING MODULES ===")
+		Local.Warn("LOADING MODULES")
 		Local.RecursiveSearch(container, 0, SETTINGS.FOLDER_SEARCH_DEPTH, Local.LoadModule)
+
+		Local.Warn("INITIALIZING MODULES")
+		for module, _ in Shared.Tracker.INIT do
+			Local.InitializeModule(Shared.Tracker.LOAD[module], module)
+		end
+
+		Local.Warn("STARTING MODULES")
+		for module, _ in Shared.Tracker.STRT do
+			Local.StartModule(Shared.Tracker.LOAD[module], module)
+		end
+
+		Local.Warn(`{LOADED_IDENTIFIER:upper()} FINISHED LOADING`)
 	else
 		Local.RecursiveSearch(container, 0, SETTINGS.FOLDER_SEARCH_DEPTH, Local.LoadModule)
+
+		for module, _ in Shared.Tracker.INIT do
+			Local.InitializeModule(Shared.Tracker.LOAD[module], module)
+		end
+
+		for module, _ in Shared.Tracker.STRT do
+			Local.StartModule(Shared.Tracker.LOAD[module], module)
+		end
 	end
 
+	Local.Print(
+		`{LOADED_IDENTIFIER} successfully loaded {Local.CountDictionary(Shared.Tracker.LOAD)} modules, it {Local.Time(
+			start_time,
+			tick()
+		)}`
+	)
 	workspace:SetAttribute(`{LOADED_IDENTIFIER}Loaded`, true)
 end
 
@@ -110,11 +138,11 @@ function Local.LoadModule(module: ModuleScript)
 			if actor_script:GetAttribute("Errored") then
 				Local.Warn(`>> Failed to load PARALLEL module {module.Name}`, Local.Time(start_time, end_time))
 			else
-				Local.Warn(`>> Loaded PARALLEL module {module.Name}`, Local.Time(start_time, end_time))
+				Local.Print(`>> Loaded PARALLEL module {module.Name}`, Local.Time(start_time, end_time))
 			end
 		end
 
-		Shared.TrackerForActors[module] = new_actor
+		Shared.TrackerForActors.LOAD[module] = new_actor
 
 		Shared.Tracker.LOAD[module] = true
 		Shared.Tracker.INIT[module] = true
@@ -153,6 +181,106 @@ function Local.LoadModule(module: ModuleScript)
 	end
 end
 
+function Local.InitializeModule(loaded_module, module: ModuleScript)
+	local start_time = tick()
+
+	if Shared.TrackerForActors.LOAD[module] then
+		local actor_script = Shared.TrackerForActors.LOAD[module]:FindFirstChildWhichIsA("BaseScript")
+		Shared.TrackerForActors.LOAD[module]:SendMessage("InitModule")
+
+		if SETTINGS.VERBOSE_LOADING then
+			Local.Print(("Initializing PARALLEL module '%s'"):format(actor_script.Name))
+		end
+
+		if not actor_script:GetAttribute("Initialized") then
+			actor_script:GetAttributeChangedSignal("Initialized"):Wait()
+		end
+
+		if SETTINGS.VERBOSE_LOADING then
+			if actor_script:GetAttribute("Errored") then
+				Local.Warn(`>> Failed to init PARALLEL module {actor_script.Name}`, Local.Time(start_time, tick()))
+			else
+				Local.Print(`>> Initialized PARALLEL module {actor_script.Name}`, Local.Time(start_time, tick()))
+			end
+		end
+
+		return
+	end
+
+	if not loaded_module.Init then
+		return
+	end
+
+	if SETTINGS.VERBOSE_LOADING then
+		Local.Print(("Initializing module '%s'"):format(module.Name))
+	end
+
+	local success, response = pcall(function()
+		loaded_module:Init()
+		Shared.Tracker.INIT[module] = true
+	end)
+
+	if not SETTINGS.VERBOSE_LOADING then
+		return
+	end
+
+	if success then
+		Local.Print(`>> Initialized module {module.Name}`, Local.Time(start_time, tick()))
+	else
+		Local.Warn(`>> Failed to init module {module.Name} got response: {response}`, Local.Time(start_time, tick()))
+	end
+end
+
+function Local.StartModule(loaded_module, module: ModuleScript)
+	local start_time = tick()
+
+	if Shared.TrackerForActors.LOAD[module] then
+		local actor_script = Shared.TrackerForActors.LOAD[module]:FindFirstChildWhichIsA("BaseScript")
+		Shared.TrackerForActors.LOAD[module]:SendMessage("StartModule")
+
+		if SETTINGS.VERBOSE_LOADING then
+			Local.Print(("Starting PARALLEL module '%s'"):format(actor_script.Name))
+		end
+
+		if not actor_script:GetAttribute("Started") then
+			actor_script:GetAttributeChangedSignal("Started"):Wait()
+		end
+
+		if SETTINGS.VERBOSE_LOADING then
+			if actor_script:GetAttribute("Errored") then
+				Local.Warn(`>> Failed to start PARALLEL module {actor_script.Name}`, Local.Time(start_time, tick()))
+			else
+				Local.Print(`>> Started PARALLEL module {actor_script.Name}`, Local.Time(start_time, tick()))
+			end
+		end
+
+		return
+	end
+
+	if not loaded_module.Start then
+		return
+	end
+
+	if SETTINGS.VERBOSE_LOADING then
+		Local.Print(("Starting module '%s'"):format(module.Name))
+	end
+
+	local success, response = pcall(function()
+		loaded_module:Start()
+		Shared.Tracker.STRT[module] = true
+	end)
+
+	if not SETTINGS.VERBOSE_LOADING then
+		return
+	end
+
+	if success then
+		Local.Print(`>> Started module {module.Name}`, Local.Time(start_time, tick()))
+	else
+		Local.Warn(`>> Failed to start module {module.Name} got response: {response}`, Local.Time(start_time, tick()))
+	end
+end
+
 -- RecursiveSearch is exactly what it says on the box.
 -- A simple loop checks what type of instance it is, and the current search depth.
 -- If it is a File, it checks the current depth and will determine
@@ -185,6 +313,16 @@ end
 
 function Local.Time(start_time: number, end_time: number)
 	return ("took %.3fms"):format(end_time - start_time)
+end
+
+function Local.CountDictionary(dictionary)
+	local count = 0
+
+	for _, _ in pairs(dictionary) do
+		count += 1
+	end
+
+	return count
 end
 
 return Shared
