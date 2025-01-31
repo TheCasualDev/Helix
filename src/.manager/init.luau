@@ -58,7 +58,22 @@ local LOADED_IDENTIFIER = if IsClient then "Client" else "Server"
 -- Main Function
 
 function Shared.Start(container: Instance)
-	-- PLACEHOLDER
+	if IsClient and SETTINGS.WAIT_FOR_SERVER and not workspace:GetAttribute("ServerLoaded") then
+		workspace:GetAttributeChangedSignal("ServerLoaded"):Wait()
+	end
+
+	if not RunService:IsStudio() and SETTINGS.VERBOSE_LOADING then
+		warn("!!WARNING!! -- VERBOSE LOADING STILL ENABLED -- !!WARNING!!")
+	end
+
+	if SETTINGS.VERBOSE_LOADING then
+		Local.warn("=== LOADING MODULES ===")
+		Local.RecursiveSearch(container, 0, SETTINGS.FOLDER_SEARCH_DEPTH, Local.LoadModule)
+	else
+		Local.RecursiveSearch(container, 0, SETTINGS.FOLDER_SEARCH_DEPTH, Local.LoadModule)
+	end
+
+	workspace:SetAttribute(`{LOADED_IDENTIFIER}Loaded`, true)
 end
 
 -- Private Functions
@@ -124,7 +139,6 @@ function Local.RecursiveSearch(
 end
 
 -- Custom print functions to make the console organised
-
 function Local.Print(...)
 	print(PRINT_IDENTIFIER, ...)
 end
