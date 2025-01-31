@@ -67,7 +67,7 @@ function Shared.Start(container: Instance)
 	end
 
 	if SETTINGS.VERBOSE_LOADING then
-		Local.warn("=== LOADING MODULES ===")
+		Local.Warn("=== LOADING MODULES ===")
 		Local.RecursiveSearch(container, 0, SETTINGS.FOLDER_SEARCH_DEPTH, Local.LoadModule)
 	else
 		Local.RecursiveSearch(container, 0, SETTINGS.FOLDER_SEARCH_DEPTH, Local.LoadModule)
@@ -82,8 +82,45 @@ function Local.LoadModule(module: ModuleScript)
 	local start_time = tick()
 
 	if module:GetAttribute("Parallel") then
-		-- TODO: Setup parallel loading (and make it work this time)
-		Local.Warn("Parallel is not setup yet.")
+		local new_actor: Actor = if IsClient then ActorForClient:Clone() else ActorForServer:Clone()
+		local actor_script = new_actor:FindFirstChildWhichIsA("BaseScript")
+
+		Local.Print(module, module.Name, actor_script)
+
+		actor_script.Name = `Required{module.Name}`
+		new_actor.Parent = ACTOR_PARENT
+
+		if not actor_script:GetAttribute("Loaded") then
+			actor_script:GetAttributeChangedSignal("Loaded"):Wait()
+		end
+
+		new_actor:SendMessage("RequireModule", module)
+
+		if SETTINGS.VERBOSE_LOADING then
+			Local.Print(("Loading PARALLEL module '%s'"):format(module.Name))
+		end
+
+		if not actor_script:GetAttribute("Required") then
+			actor_script:GetAttributeChangedSignal("Required"):Wait()
+		end
+
+		local end_time = tick()
+
+		if SETTINGS.VERBOSE_LOADING then
+			if actor_script:GetAttribute("Errored") then
+				Local.Warn(`>> Failed to load PARALLEL module {module.Name}`, Local.Time(start_time, end_time))
+			else
+				Local.Warn(`>> Loaded PARALLEL module {module.Name}`, Local.Time(start_time, end_time))
+			end
+		end
+
+		Shared.TrackerForActors[module] = new_actor
+
+		Shared.Tracker.LOAD[module] = true
+		Shared.Tracker.INIT[module] = true
+		Shared.Tracker.STRT[module] = true
+
+		return
 	end
 
 	if SETTINGS.VERBOSE_LOADING then
@@ -147,7 +184,7 @@ function Local.Warn(...)
 end
 
 function Local.Time(start_time: number, end_time: number)
-	("took %.3f"):format(end_time - start_time)
+	return ("took %.3fms"):format(end_time - start_time)
 end
 
 return Shared
